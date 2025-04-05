@@ -1,0 +1,32 @@
+# Experiment Metadata
+run_name: "triage_gpt4omini_zeroshot_natural"
+
+# Data Configuration
+dataset:
+  name: "KTAS-triage" # Corresponds to your keys in utils_data._DATASETS
+  start_index: null
+  end_index: null
+  load_predictions: null # Can be overridden by CLI
+
+# Model Configuration
+model:
+  name: "gpt-4o-mini"
+  # Add any model-specific args here if needed (e.g., temperature)
+
+# Prediction Strategy & Prompting
+prompting_strategy: "Vanilla"
+k_shots: 0 # Set > 0 for few-shot strategies
+k_shots_ablation: false # Set true for k-shots ablation logic
+serialization: "natural"
+return_json: True
+
+# Output Configuration
+results_dir: "./results/"
+checkpoints_dir: "./results/checkpoints/"
+checkpoint_frequency: 250 # Save every N predictions
+
+# Evaluation Configuration
+evaluate: true # Whether to run evaluation at the end
+
+# Debugging
+debug: false
