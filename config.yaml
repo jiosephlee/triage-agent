@@ -1,32 +1,31 @@
 # Experiment Metadata
-run_name: "triage_gpt4omini_zeroshot_natural"
 
 # Data Configuration
 dataset:
-  name: "KTAS-triage" # Corresponds to your keys in utils_data._DATASETS
-  start_index: null
-  end_index: null
-  load_predictions: null # Can be overridden by CLI
-
+  name: "ktas-triage-multi" # Corresponds to your keys in utils_data._DATASETS
+  start_index: 0
+  end_index: 30  # Exclusive end index
+  
 # Model Configuration
 model:
-  name: "gpt-4o-mini"
+  name: "openai-o3-mini-chat" #openai-gpt-4o-high-quota-chat" #gpt-4o-mini"
+  temperature: 0.0
+  max_tokens: 1000
+  top_p: 0.0
+  return_json: False
+  logprobs: False
+  use_json_schema: False
   # Add any model-specific args here if needed (e.g., temperature)
 
 # Prediction Strategy & Prompting
-prompting_strategy: "Vanilla"
-k_shots: 0 # Set > 0 for few-shot strategies
-k_shots_ablation: false # Set true for k-shots ablation logic
-serialization: "natural"
-return_json: True
-
+predictor: 
+  strategy: "vanilla"
+  k_shots: 0 # Set > 0 for few-shot strategies
 # Output Configuration
-results_dir: "./results/"
-checkpoints_dir: "./results/checkpoints/"
-checkpoint_frequency: 250 # Save every N predictions
-
-# Evaluation Configuration
-evaluate: true # Whether to run evaluation at the end
+filepaths:
+  results_dir: "./results/"
+  checkpoints_dir: "./results/checkpoints/"
+  checkpoint_frequency: 250 # Save every N predictions
 
 # Debugging
-debug: false
+debug: False

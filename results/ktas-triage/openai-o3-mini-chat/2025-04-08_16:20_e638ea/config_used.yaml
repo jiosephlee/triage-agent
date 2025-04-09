@@ -1,0 +1,20 @@
+dataset:
+  end_index: 1
+  name: ktas-triage
+  start_index: 0
+debug: true
+filepaths:
+  checkpoint_frequency: 250
+  checkpoints_dir: ./results/checkpoints/
+  results_dir: ./results/
+model:
+  logprobs: false
+  max_tokens: 1000
+  name: openai-o3-mini-chat
+  return_json: false
+  temperature: 0.0
+  top_p: 0.0
+  use_json_schema: false
+predictor:
+  k_shots: 0
+  strategy: vanilla

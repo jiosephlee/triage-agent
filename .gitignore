@@ -172,5 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-*.npy
+
+# Other files
 keys.py
+*.code-workspace

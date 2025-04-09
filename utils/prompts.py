@@ -1,17 +1,5 @@
 import pandas as pd
-
-TEMPLATES = {
-  "triage-mimic": {
-    "spaces": "age   sex   race   arrival   temperature   heartrate   resprate   o2sat   sbp   dbp   pain   chiefcomplaint\n{age} years   {sex}   {race}   {arrival}   {temperature}°F   {heartrate} bpm   {resprate} breaths/min   {o2sat}%   {sbp} mmHg   {dbp} mmHg   {pain}   {chiefcomplaint}",
-    "commas": "age, sex, race, arrival, temperature, heartrate, resprate, o2sat, sbp, dbp, pain, chiefcomplaint\n{age} years, {sex}, {race}, {arrival}, {temperature}°F, {heartrate} bpm, {resprate} breaths/min, {o2sat}%, {sbp} mmHg, {dbp} mmHg, {pain}, {chiefcomplaint}",
-    "newline": "age: {age} years\nsex: {sex}\nrace: {race}\narrival: {arrival}\ntemperature: {temperature}°F\nheartrate: {heartrate} bpm\nresprate: {resprate} breaths/min\no2sat: {o2sat}%\nsbp: {sbp} mmHg\ndbp: {dbp} mmHg\npain: {pain}\nchiefcomplaint: {chiefcomplaint}\n",
-  },
-  "triage-ktas": {
-    "spaces": "age   sex   temperature   heartrate   resprate   sbp   dbp   pain   chiefcomplaint   diagnosis in ED   injury   arrival   mental\n{age} years   {sex}   {temperature}°F   {heartrate} bpm   {resprate} breaths/min   {sbp} mmHg   {dbp} mmHg   {pain}   {chiefcomplaint}   {suspicion}   {injury}   {arrival}   {mental}",
-    "commas": "age, sex, temperature, heartrate, resprate, sbp, dbp, pain, chiefcomplaint, diagnosis in ED, injury, arrival, mental\n{age} years, {sex}, {temperature}°F, {heartrate} bpm, {resprate} breaths/min, {sbp} mmHg, {dbp} mmHg, {pain}, {chiefcomplaint}, {suspicion}, {injury}, {arrival}, {mental}",
-    "newline": "age: {age} years\nsex: {sex}\ntemperature: {temperature}°F\nheartrate: {heartrate} bpm\nresprate: {resprate} breaths/min\nsbp: {sbp} mmHg\ndbp: {dbp} mmHg\npain: {pain}\nchiefcomplaint: {chiefcomplaint}\ndiagnosis in ED: {suspicion}\ninjury: {injury}\narrival mode: {arrival}\nmental: {mental}",
-  }
-}
+import utils.utils_triage as utils_triage
 
 ALPACA_PROMPT = """### Instruction: {instruction}
 
@@ -35,12 +23,12 @@ BLACKBOX_LLM_PROMPT_WITH_EXAMPLES = """### Instructions
 {}"""
 
 INSTRUCTIONS = {    
-    "triage-ktas": {
-        "Vanilla": {
+    "ktas-triage": {
+        "vanilla": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": "Based on the patient's clinical presentation, please determine the appropriate KTAS acuity level on a scale from 1 to 5. KTAS 1 indicates the highest priority and KTAS 5 indicates the lowest priority."
         },
-        "CoT": {
+        "cot": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": """Your task is to determine the patient's KTAS acuity based on the patient's clinical presentation, where KTAS 1 indicates the highest priority and KTAS 5 indicates the lowest priority. Let's understand the KTAS levels and solve this step by step.
 
@@ -58,16 +46,16 @@ KTAS 5: Conditions from chronic problems with possible exacerbation. May be dela
 ** Step 2: Evaluate the Patient's Condition **
 ** Step 3: Determine Final KTAS Level Based on Assessment **"""
         },
-        "AutoCoT": {
+        "autocot": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS). Think carefully step by step.",
             "user": "Based on the patient's clinical presentation, please determine the appropriate KTAS acuity level on a scale from 1 to 5. KTAS 1 indicates the highest priority and KTAS 5 indicates the lowest priority."
         },
-        "FewShot": {
+        "fewshot": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": """Your task is to determine the patient's KTAS acuity based on the patient's clinical presentation, where KTAS 1 indicates the highest priority (requiring immediate, life-saving intervention), and KTAS 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their KTAS acuity levels, followed by a new patient case. Use the examples and your knowledge of KTAS protocol to determine the appropriate KTAS acuity level for the new patient."""
         },
-        "FewShotCoT": {
+        "fewshotcot": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": """Your task is to determine the patient's KTAS acuity based on the patient's clinical presentation, where KTAS 1 indicates the highest priority (requiring immediate, life-saving intervention), and KTAS 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their KTAS acuity levels, followed by a new patient case. Let's analyze the examples and solve the problem step by step. 
@@ -76,12 +64,12 @@ Below are some example cases with their KTAS acuity levels, followed by a new pa
 ** Step 2: Analyze and Compare with Other Patient Cases **
 ** Step 3: Determine the KTAS acuity level for this patient based on the examples, KTAS protocol, and your assessment of the patient's clinical presentation **"""
         },
-        "KATE": {
+        "kate": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": """Your task is to determine the patient's KTAS acuity based on the patient's clinical presentation, where KTAS 1 indicates the highest priority (requiring immediate, life-saving intervention), and KTAS 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their KTAS acuity levels, followed by a new patient case. Use the examples and your knowledge of KTAS protocol to determine the appropriate KTAS acuity level for the new patient."""
         },
-        "KATECoT": {
+        "katecot": {
             "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
             "user": """Your task is to determine the patient's KTAS acuity based on the patient's clinical presentation, where KTAS 1 indicates the highest priority (requiring immediate, life-saving intervention), and KTAS 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their KTAS acuity levels, followed by a new patient case. Let's analyze the examples and solve the problem step by step. 
@@ -92,11 +80,11 @@ Below are some example cases with their KTAS acuity levels, followed by a new pa
         },
     },
     "triage-handbook": {
-        "Vanilla": {
+        "vanilla": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": "Based on the patient's clinical presentation, please determine the appropriate ESI acuity level on a scale from 1 to 5. ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed)."
         },
-        "SelfConsistency": {
+        "selfconsistency": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). Let's first understand the problem and solve the problem step by step.
 
@@ -133,12 +121,12 @@ Prioritize Severe Pain or Distress: Patients reporting severe pain (≥7/10) or 
 
 ** Step 4: If it's not clear by now, determine the appropriate ESI acuity level to the best of your ability. **"""
         },
-        "AutoCoT": 
+        "autocot": 
             {
             "system": "You are an expert on the Emergency Severity Index (ESI). Think carefully step by step.",
             "user": "Based on the patient's clinical presentation, please determine the appropriate ESI acuity level on a scale from 1 to 5. ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed)."
         },
-        "DemonstrationCoT": 
+        "demonstrationcot": 
             {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Based on the patient's clinical presentation, please determine the appropriate ESI acuity level on a scale from 1 to 5. ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). Here's a demonstration of how to do this:
@@ -146,7 +134,7 @@ Prioritize Severe Pain or Distress: Patients reporting severe pain (≥7/10) or 
 Case: A 34-year-old obese female presents to triage complaining of generalized abdominal pain (pain scale rating: 6/10) for 2 days. She has vomited several times and states her last bowel movement was 3 days ago. She has a history of back surgery, takes no medications, and is allergic to peanuts. Vital signs: T 97.8° F, HR 104, RR 16, BP 132/80, SpO2 99 percent.
 Rationale: This patient will need a minimum of two or more resources: lab, IV fluids, perhaps IV medication for nausea, and a CT scan. The triage nurse would review the patient's vital signs and consider the heart rate. The heart rate falls just outside the accepted parameter for the age of the patient but could be due to pain or exertion. In this case, the decision should be to assign the patient to ESI level 3."""
         },
-        "CoT": 
+        "cot": 
             {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). Let's first understand the problem and solve the problem step by step.
@@ -185,12 +173,12 @@ Prioritize Severe Pain or Distress: Patients reporting severe pain (≥7/10) or 
 ** Step 4: If it's not clear by now, determine the appropriate ESI acuity level to the best of your ability. **
      """
         },
-        "FewShot": {
+        "fewshot": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their ESI acuity levels, followed by a new patient case. Use the examples and your knowledge of ESI protocol to determine the appropriate ESI acuity level for the new patient."""
         },
-        "FewShotCoT": {
+        "fewshotcot": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their ESI acuity levels, followed by a new patient case. Let's analyze the examples and solve the problem step by step. 
@@ -199,17 +187,17 @@ Below are some example cases with their ESI acuity levels, followed by a new pat
 ** Step 2: Analyze and Compare with Other Patient Cases **
 ** Step 3: Determine the ESI acuity level for this patient based on the examples and your assessment of the patient's clinical presentation **"""
         },
-        "KATE": {
+        "kate": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their ESI acuity levels, followed by a new patient case. Use the examples and your knowledge of ESI protocol to determine the appropriate ESI acuity level for the new patient."""
         },
-        "KATEAutoCoT": {
+        "kateautocot": {
             "system": "You are an expert on the Emergency Severity Index (ESI). Think carefully step by step.",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their ESI acuity levels, followed by a new patient case. Use the examples and your knowledge of ESI protocol to determine the appropriate ESI acuity level for the new patient."""
         },
-        "KATECoT": {
+        "katecot": {
             "system": "You are an expert on the Emergency Severity Index (ESI).",
             "user": """Your task is to determine the patient's ESI acuity based on the patient's clinical presentation, where ESI 1 indicates the highest priority (requiring immediate, life-saving intervention), and ESI 5 indicates the lowest priority (non-urgent, minimal resources needed). 
 Below are some example cases with their ESI acuity levels, followed by a new patient case. Let's analyze the examples and solve the problem step by step. 
@@ -219,131 +207,23 @@ Below are some example cases with their ESI acuity levels, followed by a new pat
 ** Step 3: Determine the ESI acuity level for this patient based on the examples and your assessment of the patient's clinical presentation **"""
         }
     },
+    "ktas-triage-multi": {
+        "vanilla": {
+            "system": "You are an expert on the Korean Triage and Acuity Scale (KTAS).",
+            "user": "Based on the patients' clinical presentation, which patient is the most acutely ill and should be seen first?"
+        },
+    }
 }
-    
-def convert_arrival(arrival_transport, dataset = 'triage-mimic'):
-    if 'triage' in dataset.lower():
-        mapping = {
-            "WALK IN": " via walk-in",
-            "AMBULANCE": " via ambulance",
-            "UNKNOWN": "",
-            "OTHER": "",
-            "HELICOPTER": "via helicopter",
-            "EMS": " via EMS transport",
-            "PRIVATE VEHICLE": " via private vehicle",
-        }
-    elif 'ktas' in dataset.lower():
-        mapping = {
-            "WALKING": " arriving on foot",
-            "119 AMBULANCE": " arriving by public ambulance",
-            "PRIVATE VEHICLE": " arriving by private vehicle",
-            "PRIVATE AMBULANCE": " arriving by private ambulance",
-            'PUBLIC TRANSPORTATION': "arriving by public transportation",
-            'WHEELCHAIR': 'came on a wheelchair'
-        }
-    return mapping.get(arrival_transport.upper(), "")
-
-def format_row(row, dataset='triage-mimic', serialization='natural'):
-    # Create a natural language description of the patient.
-    if 'ktas' in dataset.lower():
-        if serialization in TEMPLATES.get('triage-ktas', {}):
-            template = TEMPLATES['triage-ktas'][serialization]
-            return template.format(
-                temperature=row.get('BT', 'N/A'),
-                heartrate=row.get('HR', 'N/A'),
-                resprate=row.get('RR', 'N/A'),
-                sbp=row.get('SBP', 'N/A'),
-                dbp=row.get('DBP', 'N/A'),
-                pain=row.get('NRS_pain', 'N/A'),
-                chiefcomplaint=row.get('Chief_complain', 'N/A'),
-                suspicion=row.get('Diagnosis in ED', 'N/A'),
-                injury=row.get('Injury', 'N/A'),
-                arrival=row.get('Arrival mode', 'N/A'),
-                mental=row.get('Mental', 'N/A'),
-                age=row.get('Age', 'N/A'),
-                sex=row.get('Sex', 'N/A'),            
-                )
-        # --- Triage-ktas version ---
-        age = f"{int(row['Age'])}-year-old " if pd.notna(row.get("Age")) else ""
-        
-        # Map the Sex column: assuming 1 = Female, 2 = Male.
-        sex = row.get("Sex")
-        if pd.isna(sex):
-            gender_str = "person"
-            pronoun = "They have"
-        else:
-            if sex == 'Female':
-                gender_str = "woman"
-                pronoun = "She has"
-            elif sex == 'Male':
-                gender_str = "man"
-                pronoun = "He has"
-            else:
-                gender_str = "person"
-                pronoun = "They have"
-        
-        arrival_text = convert_arrival(row.get("Arrival mode"),dataset=dataset)
-        
-        chief_text = f" with a chief complaint of '{row['Chief_complain']}'" if pd.notna(row.get("Chief_complain")) else ""
-        
-        # Include information about injury if applicable.
-        injury = row.get("Injury")
-        injury_text = ""
-        if pd.notna(injury):
-            if injury == 'Yes':
-                injury_text = " who sustained an injury"
-        
-        # Prepare the vital signs.
-        vitals = {}
-        vitals["temperature"] = f" temperature of {row['BT']}°C" if pd.notna(row.get("BT")) else ""
-        vitals["heartrate"] = f", heart rate of {row['HR']} bpm" if pd.notna(row.get("HR")) else ""
-        vitals["resprate"] = f", respiratory rate of {row['RR']} breaths/min" if pd.notna(row.get("RR")) else ""
-        vitals["sbp"] = f", systolic blood pressure of {row['SBP']} mmHg" if pd.notna(row.get("SBP")) else ""
-        vitals["dbp"] = f", diastolic blood pressure of {row['DBP']} mmHg" if pd.notna(row.get("DBP")) else ""
-        
-        # Handle pain:
-        # 'Pain' is a flag (0 or 1) indicating whether the patient feels pain.
-        # 'NRS_pain' provides the actual pain level (and may be NA).
-        # Since 'Pain' is never null, we can safely convert it to an integer.
-        pain_flag = int(row["Pain"])
-        if pain_flag == 1:
-            if pd.notna(row.get("NRS_pain")):
-                vitals["pain"] = f", and reports pain with a level of {row['NRS_pain']}."
-            else:
-                vitals["pain"] = ", and reports pain but no level was provided"
-        else:
-            vitals["pain"] = ""
-        # Mental status, if available.
-        if pd.notna(row.get("Mental")):
-            vitals["mental"] = f" He is mentally {row['Mental']}"
-        else:
-            vitals["mental"] = ""
-        
-        missing_vitals = [key for key, value in vitals.items() if value == ""]
-        
-        description = (
-            f"A {age}{gender_str}{injury_text} arrives at the emergency department"
-            f"{arrival_text}{chief_text}. "
-            f"{pronoun}{''.join(vitals.values())}."
-            f" The patient is suspected to have {row['Diagnosis in ED']}."
-        )
-        if missing_vitals:
-            missing_str = ", ".join(missing_vitals).replace("_", " ")
-            description += f" Data on {missing_str} is missing."
-        
-        return description
-    elif dataset.lower() == 'triage-handbook':
-        return row.get('Clinical Vignettes', 'N/A')
 
 
 # Function to convert a CSV row into instruction, input, and output strings.
-def format_instruction_prompt_for_blackbox(row, strategy='Vanilla', dataset='triage-mimic', serialization='natural', return_json=False, examples=None):
+def format_instruction_prompt_for_blackbox(text, strategy='vanilla', dataset='ktas-triage', return_json=False, use_json_schema=False, examples=None):
     """
     Format instruction prompt based on strategy.
     
     Args:
         row: The patient data row
-        strategy: The prompting strategy to use ('Vanilla', 'CoT', 'FewShot', etc.)
+        strategy: The prompting strategy to use ('vanilla', 'cot', 'fewshot', etc.)
         dataset: The dataset being used (default: 'triage-mimic')
         serialization: How to format the patient data ('natural', 'spaces', etc.)
         return_json: Whether to request JSON-formatted output
@@ -365,53 +245,54 @@ def format_instruction_prompt_for_blackbox(row, strategy='Vanilla', dataset='tri
         
     # Get base prompt template & serialize patient data
     prompt = INSTRUCTIONS[dataset][strategy].copy()  # Create copy to avoid modifying original
-    patient_description = format_row(row, dataset=dataset, serialization=serialization)
     
     # Add JSON formatting instructions if needed
-    if return_json:
+    if return_json and not use_json_schema:
         json_instruction = (
             """ Output your response strictly in JSON format with the following keys:
 "Reasoning": <the step by step rationale>,
 "Acuity": <the assigned acuity level as an integer between 1 and 5>,
-"""
-            if 'CoT' in strategy else
-            """ Output your response strictly in JSON format with the following key:
+""" if 'cot' in strategy else """ Output your response strictly in JSON format with the following key:
 "Acuity": <the assigned acuity level as an integer between 1 and 5>"""
         )
         prompt['system'] += json_instruction
     
     # Handle different strategy types
-    if 'KATE' in strategy or 'FewShot' in strategy:
-        if not examples:
-            raise ValueError(f"Strategy {strategy} requires examples but none were provided")
-        prompt['user'] = BLACKBOX_LLM_PROMPT_WITH_EXAMPLES.format(
-            prompt['user'],
-            examples,
-            patient_description
-        )
-    else:
-        prompt['user'] = BLACKBOX_LLM_PROMPT.format(
-            prompt['user'],
-            patient_description
-        )
-
+    # if 'kate' in strategy or 'fewshot' in strategy:
+    #     # patient_description = utils_triage.format_row(text, dataset=dataset, serialization=serialization)
+    #     if not examples:
+    #         raise ValueError(f"Strategy {strategy} requires examples but none were provided")
+    #     prompt['user'] = BLACKBOX_LLM_PROMPT_WITH_EXAMPLES.format(
+    #         prompt['user'],
+    #         examples,
+    #         patient_description
+    #     )
+    # else:
+    #     prompt['user'] = BLACKBOX_LLM_PROMPT.format(
+    #         prompt['user'],
+    #         patient_description
+    #     )
+    prompt['user'] = BLACKBOX_LLM_PROMPT.format(
+        prompt['user'],
+        text
+    )
     return prompt
 
-def format_instruction_prompt_for_finetuning(row, EOS_TOKEN, dataset='triage-mimic', split='train'):
-    patient_description = format_row(row, dataset=dataset)
+# def format_instruction_prompt_for_finetuning(text, EOS_TOKEN, dataset='triage-mimic', split='train'):
+#     patient_description = format_row(text, dataset=dataset)
     
-    # Define the instruction for the model.
-    if dataset=='triage-mimic' or dataset=='triage-handbook':
-        instruction = "Based on the clinical presentation, determine the Emergency Severity Index (ESI) acuity for the following patient."
-        output_text = f"The ESI acuity for this patient is {row['acuity']}."
-    elif dataset=='triage-ktas':
-        instruction = "Based on their clinical presentation, determine the KTAS acuity for the following patient."
-        output_text = f"The KTAS acuity for this patient is {row['KTAS_expert']}."
-    else: 
-        raise Exception("Invalid dataset name")
+#     # Define the instruction for the model.
+#     if dataset=='triage-mimic' or dataset=='triage-handbook':
+#         instruction = "Based on the clinical presentation, determine the Emergency Severity Index (ESI) acuity for the following patient."
+#         output_text = f"The ESI acuity for this patient is {row['acuity']}."
+#     elif dataset=='ktas-triage':
+#         instruction = "Based on their clinical presentation, determine the KTAS acuity for the following patient."
+#         output_text = f"The KTAS acuity for this patient is {row['KTAS_expert']}."
+#     else: 
+#         raise Exception("Invalid dataset name")
     
-    if split == 'train':
-        text = ALPACA_PROMPT.format(instruction=instruction, input=patient_description, response=output_text) + EOS_TOKEN
-    elif split == 'test':
-        text = ALPACA_PROMPT.format(instruction=instruction, input=patient_description, response='')
-    return {"text": text}
+#     if split == 'train':
+#         text = ALPACA_PROMPT.format(instruction=instruction, input=patient_description, response=output_text) + EOS_TOKEN
+#     elif split == 'test':
+#         text = ALPACA_PROMPT.format(instruction=instruction, input=patient_description, response='')
+#     return {"text": text}

@@ -4,10 +4,11 @@ import pandas as pd
 import json
 from datetime import datetime
 import utils.utils as utils
-import utils.utils_data as utils_data
+from utils.dataset import DATASETS
 import utils.predictors as predictors
 import time
 import os
+import re
 import uuid # Or use timestamp + random string for run_id
 import subprocess # For git hash
 import traceback # For logging errors
@@ -32,82 +33,7 @@ def log_experiment_run(log_file_path, run_data):
             f.write(json.dumps(run_data) + '\n')
     except Exception as e:
         print(f"ERROR: Could not write to master log file {log_file_path}: {e}")
-
-def extract_num(answer_text):
-    # Use regex to find all floats and integers in the answer text
-    matches = re.findall(r'\d+\.\d+|\d+', answer_text)
-    
-    # Convert all matches to floats for consistent processing
-    matches = [float(num) for num in matches]
-
-    if len(matches) == 1:
-        return matches[0]  # Return the single found number
-    elif len(matches) > 1:
-        return f"Error: Multiple numbers found. Please verify the data: {answer_text}"
-    else:
         return "Error: No acuity number found" 
-    
-def extract_acuity_from_text(text, debug):
-    # Call another model to extract the acuity if necessary
-    # Split the text into lines
-    lines = text.splitlines()
-    last_five_lines = lines[-5:]
-    text = "\n".join(last_five_lines)
-    answer_text = utils.query_llm(f"Extract the estimated acuity from the following information and output the number alone. If the estimate is uncertain, just choose one that is best.\n\n\"\"\"{text}.\"\"\"", 
-                                       model= "gpt-4o-mini", debug=debug)
-    num = extract_num(answer_text)
-    time.sleep(1)
-    if type(num) == str and 'Error' in num:
-        return utils.query_llm(f"Extract the estimated acuity from the following information and output the number alone. If the estimate is uncertain, just choose one that is best.\n\n\"\"\"{text}.\"\"\"", 
-                                       model= "gpt-4o-mini", debug=debug)
-    else:
-        return num
-
-def predict(*, index, row, predictor, model, strategy, return_json, k_shots, serialization, vitals_off, bias, debug=False):
-    prompt, response = predictor.predict(
-        row=row,
-        model=model,
-        k_shots=k_shots,
-        return_json=return_json,
-        serialization_strategy=serialization,
-        vitals_off=vitals_off,
-        bias=bias,
-        debug=debug)
-    if return_json:
-        try:
-            response_data = json.loads(response)
-        except json.JSONDecodeError as e:
-            print("Error decoding JSON:", e)
-            print("Raw response causing error:", response)
-            response = utils.query_llm(response + "\n\nCan you format the above in proper JSON", model ='gpt-4o-mini',return_json=True)
-            response_data = json.loads(response)
-        if index==0:
-            return {
-                "prompt": prompt,
-                "Estimated_Acuity": response_data['Acuity'],
-                "Reasoning": response_data['Reasoning'] if 'CoT' in strategy else None,
-                **row.to_dict()  # Include the original row's data for reference
-            }
-        else:
-            return {
-                "Estimated_Acuity": response_data['Acuity'],
-                "Reasoning": response_data['Reasoning'] if 'CoT' in strategy else None,
-                **row.to_dict()  # Include the original row's data for reference
-            }
-    else: 
-        if index==0:
-            return {
-                "prompt": prompt,
-                "Estimated_Acuity": extract_acuity_from_text(response, debug=debug),
-                "Reasoning": response if 'CoT' in strategy else None,
-                **row.to_dict()  # Include the original row's data for reference
-            }
-        else:
-            return {
-                "Estimated_Acuity": extract_acuity_from_text(response, debug=debug),
-                "Reasoning": response if 'CoT' in strategy else None,
-                **row.to_dict()  # Include the original row's data for reference
-            }
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run LLM Triage Experiments.")
@@ -125,13 +51,13 @@ if __name__ == '__main__':
         config['debug'] = cli_args.debug
 
     # --- 2. Setup Run Environment ---
+    dataset_name = config['dataset']['name']
+
     timestamp_start_dt = datetime.now()
     timestamp_start_iso = timestamp_start_dt.isoformat()
     run_id = f"{timestamp_start_dt.strftime('%Y-%m-%d_%H:%M')}_{uuid.uuid4().hex[:6]}"
     git_hash, git_status = get_git_info()
-
-    dataset_name = config['dataset']['name']
-    run_output_dir = os.path.join(config.get('results_base_dir', './results'), dataset_name, run_id)
+    run_output_dir = os.path.join(config.get('results_base_dir', './results'), dataset_name, config['model']['name'], run_id)
     os.makedirs(run_output_dir, exist_ok=True)
 
     master_log_file = os.path.join(config.get('results_base_dir', './results'), 'experiment_log.jsonl')
@@ -162,20 +88,29 @@ if __name__ == '__main__':
         print(f"Effective Config: {json.dumps(config, indent=2)}")
 
         # ... [Your existing data loading logic using config] ...
-        test_dataset = utils_data.load_dataset(dataset_name)
+        test_dataset = utils.load_dataset(dataset_name, config['dataset']['start_index'], config['dataset']['end_index'])
 
         # ... [Your existing predictor setup logic using config] ...
-        predictor = predictors.Predictor(...)
+        if dataset_name == 'ktas-triage-multi':
+            predictor = predictors.MultiTriagePredictor(dataset=dataset_name, strategy=config['predictor']['strategy'])
+        elif dataset_name == 'ktas-triage':
+            predictor = predictors.TriagePredictor(dataset=dataset_name, strategy=config['predictor']['strategy'])
+        else:
+            raise ValueError(f"Unsupported dataset: {dataset_name}")
 
         predictions = [] # Load existing if needed based on config
         # ... [Your existing prediction loop logic using config] ...
         # Important: Modify predict() and other functions to accept config dict or specific params from it
 
         for i, row in tqdm(test_dataset.iterrows()): # Adjust slicing based on config/resume logic
-            prediction = predict(..., debug=config.get('debug', False)) # Pass config values
+            prompt, prediction = predictor.predict(text=row[DATASETS[dataset_name]['x_column']], 
+                                 model_config=config['model'], 
+                                 k_shots=config['predictor']['k_shots'], 
+                                return_json=config['model']['return_json'], 
+                                 use_json_schema=config['model']['use_json_schema'], 
+                                 debug=config.get('debug', False)) # Pass config values
             predictions.append(prediction)
             # Checkpoint saving logic (optional, save within run_output_dir)
-
 
         predictions_df = pd.DataFrame(predictions)
 
@@ -192,13 +127,14 @@ if __name__ == '__main__':
 
 
         # --- 6. Evaluate ---
+        target_column = DATASETS[dataset_name]['target_column']
         if config.get('evaluate', True):
             print("Evaluating predictions...")
-            ground_truths = test_dataset[utils_data._DATASETS[dataset_name]['target_column']]
+            ground_truths = test_dataset[target_column]
             # Ensure Estimated_Acuity exists
-            if 'Estimated_Acuity' not in predictions_df.columns:
-                 raise ValueError("'Estimated_Acuity' column not found in predictions DataFrame.")
-            preds = predictions_df['Estimated_Acuity']
+            if target_column not in predictions_df.columns:
+                 raise ValueError(f"'{target_column}' column not found in predictions DataFrame.")
+            preds = predictions_df[target_column]
             metrics = utils.evaluate_predictions(preds, ground_truths, ordinal=True, by_class=True)
             print("Overall Metrics:", metrics)
 
@@ -206,18 +142,15 @@ if __name__ == '__main__':
             metrics_filename = "metrics.json"
             metrics_filepath = os.path.join(run_output_dir, metrics_filename)
             with open(metrics_filepath, 'w') as f:
-                # Convert numpy types for JSON serialization if necessary
-                metrics_serializable = utils.make_dict_json_serializable(metrics) # Assumes you have/create this helper
-                json.dump(metrics_serializable, f, indent=2)
+                json.dump(metrics, f, indent=2)
             print(f"Metrics saved to {metrics_filepath}")
 
-            run_data["metrics"] = metrics_serializable # Update run data
+            run_data["metrics"] = metrics # Update run data
             run_data["status"] = "completed"
 
         else:
              print("Evaluation skipped.")
              run_data["status"] = "completed_no_eval"
-
 
     except Exception as e:
         print(f"ERROR: Run {run_id} failed!")
